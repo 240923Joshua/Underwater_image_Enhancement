@@ -1,20 +1,38 @@
 import torch
+import torch.nn.functional as F
 import math
 
-def psnr(pred, target):
-    mse = torch.mean((pred - target) ** 2)
-    return 20 * math.log10(1.0 / math.sqrt(mse.item()))
+def psnr(pred, target, eps=1e-8):
+    pred = torch.clamp(pred, 0, 1)
+    target = torch.clamp(target, 0, 1)
 
-def ssim(img1, img2):
+    mse = F.mse_loss(pred, target)
+    if mse < eps or torch.isnan(mse):
+        return torch.tensor(0.0, device=pred.device)
+
+    return 20 * torch.log10(1.0 / torch.sqrt(mse))
+
+
+def ssim(pred, target, eps=1e-8):
+    pred = torch.clamp(pred, 0, 1)
+    target = torch.clamp(target, 0, 1)
+
+    mu_x = pred.mean()
+    mu_y = target.mean()
+
+    sigma_x = pred.var()
+    sigma_y = target.var()
+    sigma_xy = ((pred - mu_x) * (target - mu_y)).mean()
+
     C1 = 0.01 ** 2
     C2 = 0.03 ** 2
 
-    mu1 = img1.mean()
-    mu2 = img2.mean()
+    num = (2 * mu_x * mu_y + C1) * (2 * sigma_xy + C2)
+    den = (mu_x**2 + mu_y**2 + C1) * (sigma_x + sigma_y + C2 + eps)
 
-    sigma1 = img1.var()
-    sigma2 = img2.var()
-    sigma12 = ((img1 - mu1) * (img2 - mu2)).mean()
+    val = num / den
 
-    return ((2 * mu1 * mu2 + C1) * (2 * sigma12 + C2)) / \
-           ((mu1 ** 2 + mu2 ** 2 + C1) * (sigma1 + sigma2 + C2))
+    if torch.isnan(val):
+        return torch.tensor(0.0, device=pred.device)
+
+    return val

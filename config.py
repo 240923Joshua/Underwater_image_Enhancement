@@ -1,26 +1,43 @@
 import os
+import torch
 
 class Config:
-    # ===== PATHS =====
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    # ===== ROOT PROJECT DIR =====
+    ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-    TRAIN_INPUT = os.path.join(BASE_DIR, "dataset/train/input")
-    TRAIN_TARGET = os.path.join(BASE_DIR, "dataset/train/target")
+    # ===== DATASET PATHS =====
+    DATASET_DIR = os.path.join(ROOT_DIR, "dataset")
 
-    VAL_INPUT = os.path.join(BASE_DIR, "dataset/val/input")
-    VAL_TARGET = os.path.join(BASE_DIR, "dataset/val/target")
+    TRAIN_INPUT = os.path.join(DATASET_DIR, "train", "input")
+    TRAIN_TARGET = os.path.join(DATASET_DIR, "train", "target")
 
-    CHECKPOINT_DIR = os.path.join(BASE_DIR, "checkpoints")
-    LOG_DIR = os.path.join(BASE_DIR, "logs")
+    VAL_INPUT = os.path.join(DATASET_DIR, "val", "input")
+    VAL_TARGET = os.path.join(DATASET_DIR, "val", "target")
 
-    # ===== TRAINING =====
+    TEST_INPUT = os.path.join(DATASET_DIR, "test", "input")
+
+    # ===== OUTPUT DIRS =====
+    CHECKPOINT_DIR = os.path.join(ROOT_DIR, "checkpoints")
+    LOG_DIR = os.path.join(ROOT_DIR, "logs")
+    RESULT_DIR = os.path.join(ROOT_DIR, "results")
+
+    # ===== TRAINING SETTINGS =====
+    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
     EPOCHS = 150
-    BATCH_SIZE = 4        # safe for 8GB GPU
-    PATCH_SIZE = 128      # ⭐ patch-based training
+    BATCH_SIZE = 4          # safe for 8GB GPU
     LR = 2e-4
     NUM_WORKERS = 2
-    SAVE_EVERY = 5
 
-    # ===== MEMORY OPTIMIZATION =====
-    GRAD_ACCUM_STEPS = 2   # simulate larger batch
-    AMP = True             # mixed precision
+    # ===== PATCH TRAINING =====
+    PATCH_SIZE = 128        # 🔥 critical for Restormer memory
+    GRAD_ACCUM_STEPS = 2    # effective batch size boost
+
+    # ===== CHECKPOINTING =====
+    SAVE_EVERY = 10
+
+    # ===== AMP / MIXED PRECISION =====
+    USE_AMP = True
+
+    # ===== DEBUG / SAFETY =====
+    CLAMP_OUTPUT = True
