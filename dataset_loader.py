@@ -1,41 +1,86 @@
 import os
-import cv2
 import torch
 from torch.utils.data import Dataset
-from patch_utils import random_crop_pair
-from config import Config
+from PIL import Image
+import torchvision.transforms as T
+import random
+
 
 class UnderwaterDataset(Dataset):
-    def __init__(self, input_dir, target_dir=None, training=True):
+    def __init__(self, input_dir, target_dir, training=True):
+
         self.input_dir = input_dir
         self.target_dir = target_dir
         self.training = training
 
-        self.images = sorted(os.listdir(input_dir))
+        self.input_paths = sorted([
+            os.path.join(input_dir, f)
+            for f in os.listdir(input_dir)
+        ])
+
+        self.target_paths = sorted([
+            os.path.join(target_dir, f)
+            for f in os.listdir(target_dir)
+        ])
+
+        assert len(self.input_paths) == len(self.target_paths), \
+            "Input and target count mismatch!"
+
+        self.to_tensor = T.ToTensor()
+
+    def random_crop(self, inp, tar, size=128):
+
+        w, h = inp.size
+
+        if w < size or h < size:
+            inp = inp.resize((size, size))
+            tar = tar.resize((size, size))
+            return inp, tar
+
+        x = random.randint(0, w - size)
+        y = random.randint(0, h - size)
+
+        inp = inp.crop((x, y, x + size, y + size))
+        tar = tar.crop((x, y, x + size, y + size))
+
+        return inp, tar
+
+    def augment(self, inp, tar):
+
+        # Random horizontal flip
+        if random.random() < 0.5:
+            inp = inp.transpose(Image.FLIP_LEFT_RIGHT)
+            tar = tar.transpose(Image.FLIP_LEFT_RIGHT)
+
+        # Random vertical flip
+        if random.random() < 0.5:
+            inp = inp.transpose(Image.FLIP_TOP_BOTTOM)
+            tar = tar.transpose(Image.FLIP_TOP_BOTTOM)
+
+        # Random 90 degree rotation
+        if random.random() < 0.5:
+            inp = inp.rotate(90)
+            tar = tar.rotate(90)
+
+        return inp, tar
 
     def __len__(self):
-        return len(self.images)
-
-    def _load_image(self, path):
-        img = cv2.imread(path)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = img.astype("float32") / 255.0   # ✅ strict normalization
-        img = torch.from_numpy(img).permute(2, 0, 1)
-        return img
+        return len(self.input_paths)
 
     def __getitem__(self, idx):
-        name = self.images[idx]
 
-        inp_path = os.path.join(self.input_dir, name)
-        inp = self._load_image(inp_path)
+        inp = Image.open(self.input_paths[idx]).convert("RGB")
+        tar = Image.open(self.target_paths[idx]).convert("RGB")
 
-        if self.target_dir is not None:
-            tar_path = os.path.join(self.target_dir, name)
-            tar = self._load_image(tar_path)
-        else:
-            tar = inp.clone()
+        if self.training:
 
-        if self.training and Config.PATCH_SIZE > 0:
-            inp, tar = random_crop_pair(inp, tar, Config.PATCH_SIZE)
+            # Augmentations
+            inp, tar = self.augment(inp, tar)
+
+            # Random patch cropping
+            inp, tar = self.random_crop(inp, tar, size=128)
+
+        inp = self.to_tensor(inp)
+        tar = self.to_tensor(tar)
 
         return inp, tar
